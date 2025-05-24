@@ -19,4 +19,8 @@ type Match struct {
 	HomeGoals int    `json:"home_goals"`
 	AwayGoals int    `json:"away_goals"`
 	Played    bool   `json:"played"`
+	Team1     string `json:"team1,omitempty"`
+	Team2     string `json:"team2,omitempty"`
+	Score1    int    `json:"score1,omitempty"`
+	Score2    int    `json:"score2,omitempty"`
 }
