@@ -31,7 +31,7 @@ const PredictionsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">AI Predictions</h1>
+      <h1 className="text-2xl font-bold">Predictions</h1>
       
       {simulation && (
         <div className="bg-white rounded-lg shadow p-6">

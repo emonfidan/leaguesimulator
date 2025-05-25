@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"leaguesimulator/db"
 	"leaguesimulator/models"
 )
 
@@ -15,7 +16,7 @@ type LeagueManager struct {
 	Standings []TeamStanding
 }
 
-type Match struct {
+type MatchView struct {
 	Week   int    `json:"week"`
 	Team1  string `json:"team1"`
 	Team2  string `json:"team2"`
@@ -35,27 +36,32 @@ type TeamStanding struct {
 	Points       int    `json:"points"`
 }
 
-// Initialize league
+// InitLeague initializes teams and resets stats
 func (lm *LeagueManager) InitLeague() {
-	lm.Teams = []models.Team{
-		{Name: "Lions", Strength: 90},
-		{Name: "Tigers", Strength: 80},
-		{Name: "Bears", Strength: 70},
-		{Name: "Wolves", Strength: 60},
+	teams, err := db.GetAllTeams()
+	if err != nil || len(teams) == 0 {
+		teams = []models.Team{
+			{Name: "Lions", Strength: 90},
+			{Name: "Tigers", Strength: 80},
+			{Name: "Bears", Strength: 70},
+			{Name: "Wolves", Strength: 60},
+		}
+		_ = db.SaveTeams(teams)
 	}
+
+	lm.Teams = teams
 	lm.Week = 0
 	lm.Matches = []models.Match{}
 	lm.Standings = []TeamStanding{}
 }
 
-// Play match between two teams
+// playMatch simulates a match between home and away teams, updates their stats, returns the match record
 func (lm *LeagueManager) playMatch(week int, home *models.Team, away *models.Team) models.Match {
 	rand.Seed(time.Now().UnixNano())
-	// Generate goals based on strength
+
 	homeGoals := rand.Intn(home.Strength/15 + 1)
 	awayGoals := rand.Intn(away.Strength/15 + 1)
 
-	// Update team stats
 	if homeGoals > awayGoals {
 		home.Points += 3
 		home.Wins++
@@ -85,80 +91,71 @@ func (lm *LeagueManager) playMatch(week int, home *models.Team, away *models.Tea
 		HomeGoals: homeGoals,
 		AwayGoals: awayGoals,
 		Played:    true,
-		Team1:     home.Name,
-		Team2:     away.Name,
-		Score1:    homeGoals,
-		Score2:    awayGoals,
 	}
 }
 
-// Play next week matches
-func (lm *LeagueManager) PlayNextWeek() []Match {
-	if lm.Week >= 3 { // 4 teams = 3 rounds in round-robin (each team plays each other once)
+// PlayNextWeek simulates the matches of the next week, updates matches and standings
+func (lm *LeagueManager) PlayNextWeek() []MatchView {
+	if lm.Week >= 6 { // 6 rounds for 4 teams double round robin
 		return nil
 	}
 
-	// Define matchups for each week
 	matchups := [][][]int{
-		{{0, 1}, {2, 3}}, // Week 1: Lions vs Tigers, Bears vs Wolves
-		{{0, 2}, {1, 3}}, // Week 2: Lions vs Bears, Tigers vs Wolves
-		{{0, 3}, {1, 2}}, // Week 3: Lions vs Wolves, Tigers vs Bears
+		{{0, 1}, {2, 3}}, // Week 1
+		{{0, 2}, {1, 3}}, // Week 2
+		{{0, 3}, {1, 2}}, // Week 3
+		{{1, 0}, {3, 2}}, // Week 4 (reverse)
+		{{2, 0}, {3, 1}}, // Week 5
+		{{3, 0}, {2, 1}}, // Week 6
 	}
 
-	if lm.Week < len(matchups) {
-		weekMatchups := matchups[lm.Week]
-		var weekMatches []Match
+	weekMatchups := matchups[lm.Week]
+	var playedMatches []MatchView
 
-		for _, matchup := range weekMatchups {
-			match := lm.playMatch(lm.Week+1, &lm.Teams[matchup[0]], &lm.Teams[matchup[1]])
-			lm.Matches = append(lm.Matches, match)
+	for _, m := range weekMatchups {
+		match := lm.playMatch(lm.Week+1, &lm.Teams[m[0]], &lm.Teams[m[1]])
+		_ = db.SaveMatch(match)
+		lm.Matches = append(lm.Matches, match)
 
-			weekMatches = append(weekMatches, Match{
-				Week:   match.Week,
-				Team1:  match.HomeTeam,
-				Team2:  match.AwayTeam,
-				Score1: match.HomeGoals,
-				Score2: match.AwayGoals,
-			})
-		}
-
-		lm.Week++
-		lm.updateStandings()
-		return weekMatches
+		playedMatches = append(playedMatches, MatchView{
+			Week:   match.Week,
+			Team1:  match.HomeTeam,
+			Team2:  match.AwayTeam,
+			Score1: match.HomeGoals,
+			Score2: match.AwayGoals,
+		})
 	}
 
-	return nil
+	lm.Week++
+	lm.updateStandings()
+	return playedMatches
 }
 
-// Update standings based on current matches
+// updateStandings recalculates the league table from matches
 func (lm *LeagueManager) updateStandings() {
 	standings := make(map[string]*TeamStanding)
 
-	// Initialize standings
-	for _, team := range lm.Teams {
-		standings[team.Name] = &TeamStanding{
-			Name: team.Name,
-		}
+	for _, t := range lm.Teams {
+		standings[t.Name] = &TeamStanding{Name: t.Name}
 	}
 
-	// Calculate standings from matches
-	for _, match := range lm.Matches {
-		home := standings[match.HomeTeam]
-		away := standings[match.AwayTeam]
+	for _, m := range lm.Matches {
+		home := standings[m.HomeTeam]
+		away := standings[m.AwayTeam]
 
 		home.Played++
 		away.Played++
 
-		home.GoalsFor += match.HomeGoals
-		home.GoalsAgainst += match.AwayGoals
-		away.GoalsFor += match.AwayGoals
-		away.GoalsAgainst += match.HomeGoals
+		home.GoalsFor += m.HomeGoals
+		home.GoalsAgainst += m.AwayGoals
+		away.GoalsFor += m.AwayGoals
+		away.GoalsAgainst += m.HomeGoals
 
-		if match.HomeGoals > match.AwayGoals {
+		if m.HomeGoals > m.AwayGoals {
 			home.Won++
 			away.Lost++
 			home.Points += 3
-		} else if match.HomeGoals < match.AwayGoals {
+		} else if m.AwayGoals > m.HomeGoals {
 			away.Won++
 			home.Lost++
 			away.Points += 3
@@ -170,66 +167,61 @@ func (lm *LeagueManager) updateStandings() {
 		}
 	}
 
-	// Calculate goal difference
-	for _, standing := range standings {
-		standing.GoalDiff = standing.GoalsFor - standing.GoalsAgainst
-	}
-
-	// Convert to slice and sort
-	var sortedStandings []TeamStanding
 	for _, s := range standings {
-		sortedStandings = append(sortedStandings, *s)
+		s.GoalDiff = s.GoalsFor - s.GoalsAgainst
 	}
 
-	// Sort by points, then goal difference, then goals for
-	sort.Slice(sortedStandings, func(i, j int) bool {
-		if sortedStandings[i].Points != sortedStandings[j].Points {
-			return sortedStandings[i].Points > sortedStandings[j].Points
-		}
-		if sortedStandings[i].GoalDiff != sortedStandings[j].GoalDiff {
-			return sortedStandings[i].GoalDiff > sortedStandings[j].GoalDiff
-		}
-		return sortedStandings[i].GoalsFor > sortedStandings[j].GoalsFor
-	})
+	// Convert to slice
+	lm.Standings = []TeamStanding{}
+	for _, s := range standings {
+		lm.Standings = append(lm.Standings, *s)
+	}
 
-	lm.Standings = sortedStandings
+	sort.Slice(lm.Standings, func(i, j int) bool {
+		if lm.Standings[i].Points != lm.Standings[j].Points {
+			return lm.Standings[i].Points > lm.Standings[j].Points
+		}
+		if lm.Standings[i].GoalDiff != lm.Standings[j].GoalDiff {
+			return lm.Standings[i].GoalDiff > lm.Standings[j].GoalDiff
+		}
+		return lm.Standings[i].GoalsFor > lm.Standings[j].GoalsFor
+	})
 }
 
-// UpdateStandings - public method for router
+// UpdateStandings is a public method for external calls
 func (lm *LeagueManager) UpdateStandings() {
 	lm.updateStandings()
 }
 
-// Get current standings
+// GetStandings returns current standings
 func (lm *LeagueManager) GetStandings() []TeamStanding {
 	lm.updateStandings()
 	return lm.Standings
 }
 
-// Get all matches played
+// GetMatches returns all played matches
 func (lm *LeagueManager) GetMatches() []models.Match {
 	return lm.Matches
 }
 
-// Get future fixtures
-func (lm *LeagueManager) GetFutureFixtures() []Match {
-	var fixtures []Match
-
-	// Generate all possible matchups for remaining weeks
+// GetFutureFixtures returns matches not yet played (simple hardcoded fixture list)
+func (lm *LeagueManager) GetFutureFixtures() []MatchView {
+	var fixtures []MatchView
 	allMatchups := [][][]string{
-		{{"Lions", "Tigers"}, {"Bears", "Wolves"}}, // Week 1
-		{{"Lions", "Bears"}, {"Tigers", "Wolves"}}, // Week 2
-		{{"Lions", "Wolves"}, {"Tigers", "Bears"}}, // Week 3
+		{{"Lions", "Tigers"}, {"Bears", "Wolves"}},
+		{{"Lions", "Bears"}, {"Tigers", "Wolves"}},
+		{{"Lions", "Wolves"}, {"Tigers", "Bears"}},
+		{{"Tigers", "Lions"}, {"Wolves", "Bears"}},
+		{{"Bears", "Lions"}, {"Wolves", "Tigers"}},
+		{{"Wolves", "Lions"}, {"Bears", "Tigers"}},
 	}
 
-	// Check which weeks haven't been played yet
-	for week := lm.Week; week < 3; week++ {
-		weekMatchups := allMatchups[week]
-		for _, matchup := range weekMatchups {
-			fixtures = append(fixtures, Match{
-				Week:  week + 1,
-				Team1: matchup[0],
-				Team2: matchup[1],
+	for w := lm.Week; w < len(allMatchups); w++ {
+		for _, m := range allMatchups[w] {
+			fixtures = append(fixtures, MatchView{
+				Week:  w + 1,
+				Team1: m[0],
+				Team2: m[1],
 			})
 		}
 	}
@@ -237,26 +229,18 @@ func (lm *LeagueManager) GetFutureFixtures() []Match {
 	return fixtures
 }
 
-// Edit match result
+// EditMatchResult edits a played match and recalculates stats
 func (lm *LeagueManager) EditMatchResult(week int, team1, team2 string, score1, score2 int) bool {
-	for i, match := range lm.Matches {
-		if match.Week == week &&
-			((match.HomeTeam == team1 && match.AwayTeam == team2) ||
-				(match.HomeTeam == team2 && match.AwayTeam == team1)) {
-			// Update the match
-			if match.HomeTeam == team1 {
+	for i, m := range lm.Matches {
+		if m.Week == week &&
+			((m.HomeTeam == team1 && m.AwayTeam == team2) || (m.HomeTeam == team2 && m.AwayTeam == team1)) {
+			if m.HomeTeam == team1 {
 				lm.Matches[i].HomeGoals = score1
 				lm.Matches[i].AwayGoals = score2
 			} else {
 				lm.Matches[i].HomeGoals = score2
 				lm.Matches[i].AwayGoals = score1
 			}
-
-			// Update compatibility fields
-			lm.Matches[i].Score1 = score1
-			lm.Matches[i].Score2 = score2
-
-			// Recalculate team stats
 			lm.recalculateTeamStats()
 			return true
 		}
@@ -264,51 +248,71 @@ func (lm *LeagueManager) EditMatchResult(week int, team1, team2 string, score1, 
 	return false
 }
 
-// Recalculate team statistics after editing match results
+// recalculateTeamStats resets and recalculates all teams stats from played matches
 func (lm *LeagueManager) recalculateTeamStats() {
-	// Reset all team stats
 	for i := range lm.Teams {
-		lm.Teams[i].Points = 0
 		lm.Teams[i].Played = 0
 		lm.Teams[i].Wins = 0
 		lm.Teams[i].Draws = 0
 		lm.Teams[i].Losses = 0
 		lm.Teams[i].GoalsFor = 0
 		lm.Teams[i].GoalsAgainst = 0
+		lm.Teams[i].Points = 0
 	}
 
-	// Recalculate from all matches
-	teamMap := make(map[string]*models.Team)
-	for i := range lm.Teams {
-		teamMap[lm.Teams[i].Name] = &lm.Teams[i]
-	}
+	for _, m := range lm.Matches {
+		var home, away *models.Team
+		for i := range lm.Teams {
+			if lm.Teams[i].Name == m.HomeTeam {
+				home = &lm.Teams[i]
+			}
+			if lm.Teams[i].Name == m.AwayTeam {
+				away = &lm.Teams[i]
+			}
+		}
 
-	for _, match := range lm.Matches {
-		home := teamMap[match.HomeTeam]
-		away := teamMap[match.AwayTeam]
+		if home == nil || away == nil {
+			continue
+		}
 
 		home.Played++
 		away.Played++
-		home.GoalsFor += match.HomeGoals
-		home.GoalsAgainst += match.AwayGoals
-		away.GoalsFor += match.AwayGoals
-		away.GoalsAgainst += match.HomeGoals
+		home.GoalsFor += m.HomeGoals
+		home.GoalsAgainst += m.AwayGoals
+		away.GoalsFor += m.AwayGoals
+		away.GoalsAgainst += m.HomeGoals
 
-		if match.HomeGoals > match.AwayGoals {
-			home.Points += 3
+		if m.HomeGoals > m.AwayGoals {
 			home.Wins++
 			away.Losses++
-		} else if match.AwayGoals > match.HomeGoals {
-			away.Points += 3
+			home.Points += 3
+		} else if m.AwayGoals > m.HomeGoals {
 			away.Wins++
 			home.Losses++
+			away.Points += 3
 		} else {
-			home.Points++
-			away.Points++
 			home.Draws++
 			away.Draws++
+			home.Points++
+			away.Points++
 		}
 	}
 
+	lm.updateStandings()
+}
+
+// ResetLeague clears all matches, resets weeks and team stats
+func (lm *LeagueManager) ResetLeague() {
+	lm.Matches = []models.Match{}
+	lm.Week = 0
+	for i := range lm.Teams {
+		lm.Teams[i].Played = 0
+		lm.Teams[i].Wins = 0
+		lm.Teams[i].Draws = 0
+		lm.Teams[i].Losses = 0
+		lm.Teams[i].GoalsFor = 0
+		lm.Teams[i].GoalsAgainst = 0
+		lm.Teams[i].Points = 0
+	}
 	lm.updateStandings()
 }

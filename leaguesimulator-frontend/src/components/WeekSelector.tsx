@@ -5,7 +5,7 @@ interface WeekSelectorProps {
 }
 
 const WeekSelector: React.FC<WeekSelectorProps> = ({ currentWeek }) => {
-  const totalWeeks = 3; // Based on your league structure
+  const totalWeeks = 6; // Based on your league structure
   
   return (
     <div className="bg-white rounded-lg shadow p-4">

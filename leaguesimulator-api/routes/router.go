@@ -79,7 +79,7 @@ func SetupRouter() *gin.Engine {
 			"standings":    standings,
 			"total_teams":  len(standings),
 			"league_status": func() string {
-				if manager.Week >= 3 {
+				if manager.Week >= 6 {
 					return "completed"
 				}
 				return "ongoing"

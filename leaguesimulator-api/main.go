@@ -1,12 +1,15 @@
 package main
 
 import (
+	"leaguesimulator/db"
 	"leaguesimulator/routes"
 	"log"
 )
 
 func main() {
 	log.Println("Starting Football League Simulator...")
+	db.InitDB()
+	log.Println("Database connection is successful.")
 	log.Println("Server will run on http://localhost:8080")
 	log.Println("Available endpoints:")
 	log.Println("  POST /init-league - Initialize the league")

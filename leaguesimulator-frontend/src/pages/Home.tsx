@@ -21,7 +21,7 @@ const Home: React.FC = () => {
           </div>
           
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-            <h2 className="text-xl font-semibold mb-2 text-green-800">AI Predictions</h2>
+            <h2 className="text-xl font-semibold mb-2 text-green-800">Predictions</h2>
             <p className="mb-4">Get match predictions and championship probabilities powered by machine learning.</p>
             <Link to="/predictions" className="text-green-600 hover:text-green-800 font-medium">
               View Predictions →

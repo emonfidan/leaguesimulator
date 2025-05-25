@@ -13,14 +13,28 @@ type Team struct {
 }
 
 type Match struct {
+	ID        int    `json:"id"`
 	Week      int    `json:"week"`
 	HomeTeam  string `json:"home_team"`
 	AwayTeam  string `json:"away_team"`
 	HomeGoals int    `json:"home_goals"`
 	AwayGoals int    `json:"away_goals"`
 	Played    bool   `json:"played"`
-	Team1     string `json:"team1,omitempty"`
-	Team2     string `json:"team2,omitempty"`
-	Score1    int    `json:"score1,omitempty"`
-	Score2    int    `json:"score2,omitempty"`
+}
+
+type Prediction struct {
+	ID            int    `json:"id"`
+	TeamName      string `json:"team_name"`
+	PredictedRank int    `json:"predicted_rank"`
+	WeekSubmitted int    `json:"week_submitted"`
+}
+
+type HistoricalMatch struct {
+	ID        int    `json:"id"`
+	Season    int    `json:"season"`
+	Week      int    `json:"week"`
+	HomeTeam  string `json:"home_team"`
+	AwayTeam  string `json:"away_team"`
+	HomeGoals int    `json:"home_goals"`
+	AwayGoals int    `json:"away_goals"`
 }
