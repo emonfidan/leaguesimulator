@@ -40,6 +40,7 @@ type TeamStanding struct {
 func (lm *LeagueManager) InitLeague() {
 	teams, err := db.GetAllTeams()
 	if err != nil || len(teams) == 0 {
+		// Create default teams
 		teams = []models.Team{
 			{Name: "Lions", Strength: 90},
 			{Name: "Tigers", Strength: 80},
@@ -51,8 +52,25 @@ func (lm *LeagueManager) InitLeague() {
 
 	lm.Teams = teams
 	lm.Week = 0
-	lm.Matches = []models.Match{}
+
+	// Load existing matches from database
+	matches, err := db.GetAllMatches()
+	if err == nil {
+		lm.Matches = matches
+		// Calculate current week from existing matches
+		maxWeek := 0
+		for _, match := range matches {
+			if match.Week > maxWeek {
+				maxWeek = match.Week
+			}
+		}
+		lm.Week = maxWeek
+	} else {
+		lm.Matches = []models.Match{}
+	}
+
 	lm.Standings = []TeamStanding{}
+	lm.updateStandings()
 }
 
 // playMatch simulates a match between home and away teams, updates their stats, returns the match record
@@ -83,6 +101,10 @@ func (lm *LeagueManager) playMatch(week int, home *models.Team, away *models.Tea
 	home.GoalsAgainst += awayGoals
 	away.GoalsFor += awayGoals
 	away.GoalsAgainst += homeGoals
+
+	// Save updated team stats to database
+	_ = db.SaveSingleTeam(*home)
+	_ = db.SaveSingleTeam(*away)
 
 	return models.Match{
 		Week:      week,
@@ -201,6 +223,11 @@ func (lm *LeagueManager) GetStandings() []TeamStanding {
 
 // GetMatches returns all played matches
 func (lm *LeagueManager) GetMatches() []models.Match {
+	// Reload matches from database to ensure consistency
+	matches, err := db.GetAllMatches()
+	if err == nil {
+		lm.Matches = matches
+	}
 	return lm.Matches
 }
 
@@ -241,6 +268,10 @@ func (lm *LeagueManager) EditMatchResult(week int, team1, team2 string, score1, 
 				lm.Matches[i].HomeGoals = score2
 				lm.Matches[i].AwayGoals = score1
 			}
+
+			// Update in database
+			_ = db.UpdateMatch(lm.Matches[i])
+
 			lm.recalculateTeamStats()
 			return true
 		}
@@ -250,6 +281,10 @@ func (lm *LeagueManager) EditMatchResult(week int, team1, team2 string, score1, 
 
 // recalculateTeamStats resets and recalculates all teams stats from played matches
 func (lm *LeagueManager) recalculateTeamStats() {
+	// Reset all team stats in database
+	_ = db.ResetAllTeamStats()
+
+	// Reset local team stats
 	for i := range lm.Teams {
 		lm.Teams[i].Played = 0
 		lm.Teams[i].Wins = 0
@@ -298,11 +333,21 @@ func (lm *LeagueManager) recalculateTeamStats() {
 		}
 	}
 
+	// Save updated team stats to database
+	_ = db.SaveTeams(lm.Teams)
+
 	lm.updateStandings()
 }
 
 // ResetLeague clears all matches, resets weeks and team stats
 func (lm *LeagueManager) ResetLeague() {
+	// Clear matches from database
+	_ = db.ClearAllMatches()
+
+	// Reset team stats in database
+	_ = db.ResetAllTeamStats()
+
+	// Reset local data
 	lm.Matches = []models.Match{}
 	lm.Week = 0
 	for i := range lm.Teams {
