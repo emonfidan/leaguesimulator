@@ -3,6 +3,8 @@ package prediction
 import (
 	"encoding/json"
 	"fmt"
+	"leaguesimulator/db"
+	"log"
 	"os/exec"
 	"runtime"
 	"time"
@@ -98,18 +100,53 @@ func detectPythonCommand() string {
 	return "python3"
 }
 
-// RunAdvancedPrediction runs the enhanced prediction system
+// prediction.go
 func (aps *AdvancedPredictionService) RunAdvancedPrediction() (*ComprehensivePrediction, error) {
+	// Get historical matches from database
+	historicalMatches, err := db.GetHistoricalMatches()
+	if err != nil {
+		log.Printf("Warning: could not fetch historical matches: %v", err)
+	}
+
+	// Convert to JSON to pass to Python script
+	historicalData, err := json.Marshal(historicalMatches)
+	if err != nil {
+		log.Printf("Warning: could not marshal historical data: %v", err)
+	}
+
 	cmd := exec.Command(aps.pythonExecutable, aps.scriptPath)
+
+	// Create stdin pipe
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %v", err)
+	}
+
+	// Write historical data to stdin
+	go func() {
+		defer stdin.Close()
+		stdin.Write(historicalData)
+	}()
+
 	out, err := cmd.Output()
 	if err != nil {
-		// Try alternative Python command if the first one fails
+		// Fallback to alternative Python command if needed
 		altPython := "python"
 		if aps.pythonExecutable == "python" {
 			altPython = "python3"
 		}
 		cmd = exec.Command(altPython, aps.scriptPath)
-		out, err = cmd.Output()
+
+		// Try again with historical data
+		stdin, err = cmd.StdinPipe()
+		if err == nil {
+			go func() {
+				defer stdin.Close()
+				stdin.Write(historicalData)
+			}()
+			out, err = cmd.Output()
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute prediction script: %v", err)
 		}

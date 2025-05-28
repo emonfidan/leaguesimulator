@@ -1,6 +1,8 @@
 package league
 
 import (
+	"fmt"
+	"log"
 	"math/rand"
 	"sort"
 	"time"
@@ -106,7 +108,7 @@ func (lm *LeagueManager) playMatch(week int, home *models.Team, away *models.Tea
 	_ = db.SaveSingleTeam(*home)
 	_ = db.SaveSingleTeam(*away)
 
-	return models.Match{
+	match := models.Match{
 		Week:      week,
 		HomeTeam:  home.Name,
 		AwayTeam:  away.Name,
@@ -114,6 +116,14 @@ func (lm *LeagueManager) playMatch(week int, home *models.Team, away *models.Tea
 		AwayGoals: awayGoals,
 		Played:    true,
 	}
+
+	// Save to historical matches
+	err := db.SaveHistoricalMatch(match)
+	if err != nil {
+		log.Printf("Failed to save historical match: %v", err)
+	}
+
+	return match
 }
 
 // PlayNextWeek simulates the matches of the next week, updates matches and standings
@@ -360,4 +370,54 @@ func (lm *LeagueManager) ResetLeague() {
 		lm.Teams[i].Points = 0
 	}
 	lm.updateStandings()
+}
+
+// GetMatchById returns a match by its ID (index in matches slice)
+func (lm *LeagueManager) GetMatchById(matchId int) (models.Match, error) {
+	// Reload matches from database to ensure consistency
+	matches, err := db.GetAllMatches()
+	if err == nil {
+		lm.Matches = matches
+	}
+
+	// Check if matchId is valid (0-based index)
+	if matchId < 0 || matchId >= len(lm.Matches) {
+		return models.Match{}, fmt.Errorf("match with ID %d not found", matchId)
+	}
+
+	return lm.Matches[matchId], nil
+}
+
+// EditMatchResultById edits a match by its ID and recalculates stats
+func (lm *LeagueManager) EditMatchResultById(matchId int, homeGoals, awayGoals int) bool {
+	// Reload matches from database to ensure consistency
+	matches, err := db.GetAllMatches()
+	if err == nil {
+		lm.Matches = matches
+	}
+
+	// Check if matchId is valid
+	if matchId < 0 || matchId >= len(lm.Matches) {
+		return false
+	}
+
+	// Validate goals (should be non-negative)
+	if homeGoals < 0 || awayGoals < 0 {
+		return false
+	}
+
+	// Update the match result
+	lm.Matches[matchId].HomeGoals = homeGoals
+	lm.Matches[matchId].AwayGoals = awayGoals
+
+	// Update in database
+	err = db.UpdateMatch(lm.Matches[matchId])
+	if err != nil {
+		return false
+	}
+
+	// Recalculate all team stats based on updated matches
+	lm.recalculateTeamStats()
+
+	return true
 }

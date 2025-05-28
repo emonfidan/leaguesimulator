@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Match } from '../types/types';
 
 const API_BASE_URL = 'http://localhost:8080';
 
@@ -58,3 +59,25 @@ export const resetLeague = async () => {
   const response = await axios.post(`${API_BASE_URL}/reset`);
   return response.data;
 };
+
+export const getAllMatches = async () => {
+  const response = await axios.get(`${API_BASE_URL}/matches`);
+  return response.data;
+};
+
+export const getMatchesByWeek = async (weekNumber: number): Promise<Match[]> => {
+  const response = await axios.get(`${API_BASE_URL}/matches/week/${weekNumber}`);
+
+  const transformedMatches: Match[] = response.data.matches.map((match: any) => ({
+    id: match.id,
+    week: match.week,
+    team1: match.home_team,
+    team2: match.away_team,
+    score1: match.home_goals,
+    score2: match.away_goals,
+    played: match.played,
+  }));
+
+  return transformedMatches;
+};
+

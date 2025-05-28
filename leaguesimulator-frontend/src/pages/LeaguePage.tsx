@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPredictions, initLeague, playNextWeek, getStandings, playAllMatches, resetLeague } from '../services/api';
+import { getPredictions, initLeague, playNextWeek, getStandings, playAllMatches, resetLeague, getMatchesByWeek  } from '../services/api';
 import LeagueTable from '../components/LeagueTable';
 import MatchList from '../components/MatchList';
 import WeekSelector from '../components/WeekSelector';
@@ -12,6 +12,10 @@ const LeaguePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [simulation, setSimulation] = useState<SeasonSimulation | null>(null);
   const [needsInitialization, setNeedsInitialization] = useState(false);
+
+  const refreshData = async () => {
+    await fetchStandings();
+  };
 
   const fetchStandings = async (autoInit = false) => {
     try {
@@ -107,9 +111,14 @@ const LeaguePage: React.FC = () => {
     try {
       setLoading(true);
       await resetLeague();
-      setStandings(null);
+      // Reset işleminden sonra standings'i sıfırla ama tablonun görünmesi için
+      // initialize et
+      await initLeague();
+      const newData = await getStandings();
+      setStandings(newData);
       setMatches([]);
-      setNeedsInitialization(true);
+      setSimulation(null);
+      setNeedsInitialization(false);
     } catch (err) {
       setError('Failed to reset league');
       console.error(err);
@@ -128,6 +137,22 @@ const LeaguePage: React.FC = () => {
       fetchPredictions();
     }
   }, [standings]);
+
+  useEffect(() => {
+  const fetchRecentMatches = async () => {
+    if (standings && standings.current_week > 0) {
+      try {
+        const matchData = await getMatchesByWeek(standings.current_week);
+        setMatches(matchData); // API'nin verdiği json yapısına göre
+      } catch (err) {
+        console.error('Failed to fetch recent matches:', err);
+      }
+    }
+  };
+
+  fetchRecentMatches();
+}, [standings]);
+
 
   if (loading) return <div className="text-center py-8">Loading...</div>;
   if (error) return <div className="text-center py-8 text-red-500">{error}</div>;
@@ -209,7 +234,7 @@ const LeaguePage: React.FC = () => {
         <>
           <LeagueTable standings={standings.standings} currentWeek={standings.current_week} />
           <WeekSelector currentWeek={standings.current_week} />
-          <MatchList matches={matches} />
+          <MatchList matches={matches}  onMatchEdited={refreshData} />
         </>
       )}
     </div>

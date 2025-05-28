@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -118,6 +119,41 @@ func SetupRouter() *gin.Engine {
 		})
 	})
 
+	// Get matches by week number
+	router.GET("/matches/week/:weekNumber", func(c *gin.Context) {
+		weekNumberStr := c.Param("weekNumber")
+		weekNumber, err := strconv.Atoi(weekNumberStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid week number format",
+			})
+			return
+		}
+
+		matches := manager.GetMatches()
+		var weekMatches []models.Match
+
+		for _, match := range matches {
+			if match.Week == weekNumber {
+				weekMatches = append(weekMatches, match)
+			}
+		}
+
+		if len(weekMatches) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"message":     fmt.Sprintf("No matches found for week %d", weekNumber),
+				"week_number": weekNumber,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"week_number":   weekNumber,
+			"matches":       weekMatches,
+			"total_matches": len(weekMatches),
+		})
+	})
+
 	// Enhanced prediction endpoint
 	router.GET("/predict", func(c *gin.Context) {
 		predictions, err := predictionService.RunAdvancedPrediction()
@@ -221,14 +257,14 @@ func SetupRouter() *gin.Engine {
 
 		switch resetOptions.ResetType {
 		case "full":
-			manager.InitLeague()
+			manager.ResetLeague()
 		case "matches_only":
 			manager.Matches = []models.Match{}
 			manager.Week = 0
 		case "standings_only":
 			manager.UpdateStandings()
 		default:
-			manager.InitLeague()
+			manager.ResetLeague()
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -252,14 +288,14 @@ func SetupRouter() *gin.Engine {
 		})
 	})
 
-	// Enhanced edit match result
+	// Enhanced edit match result (keeping the old endpoint for backward compatibility)
 	router.POST("/edit-result", func(c *gin.Context) {
 		var editRequest struct {
 			Week   int    `json:"week" binding:"required"`
 			Team1  string `json:"team1" binding:"required"`
 			Team2  string `json:"team2" binding:"required"`
-			Score1 int    `json:"score1" binding:"required"`
-			Score2 int    `json:"score2" binding:"required"`
+			Score1 *int   `json:"score1" binding:"required"`
+			Score2 *int   `json:"score2" binding:"required"`
 			Reason string `json:"reason,omitempty"`
 		}
 
@@ -274,8 +310,8 @@ func SetupRouter() *gin.Engine {
 			editRequest.Week,
 			editRequest.Team1,
 			editRequest.Team2,
-			editRequest.Score1,
-			editRequest.Score2,
+			*editRequest.Score1,
+			*editRequest.Score2,
 		)
 
 		if !success {
@@ -290,7 +326,7 @@ func SetupRouter() *gin.Engine {
 			"updated_match": gin.H{
 				"week":      editRequest.Week,
 				"teams":     editRequest.Team1 + " vs " + editRequest.Team2,
-				"new_score": strconv.Itoa(editRequest.Score1) + "-" + strconv.Itoa(editRequest.Score2),
+				"new_score": strconv.Itoa(*editRequest.Score1) + "-" + strconv.Itoa(*editRequest.Score2),
 				"reason":    editRequest.Reason,
 			},
 			"updated_standings": manager.GetStandings(),

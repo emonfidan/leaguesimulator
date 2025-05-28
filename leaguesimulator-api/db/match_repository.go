@@ -72,3 +72,20 @@ func ClearAllMatches() error {
 	_, err := DB.Exec(query)
 	return err
 }
+
+// match_repository.go
+func SaveHistoricalMatch(match models.Match) error {
+	query := `
+        INSERT INTO historical_matches 
+        (season, week, home_team_name, away_team_name, home_goals, away_goals)
+        VALUES (1, ?, ?, ?, ?, ?)
+    `
+	_, err := DB.Exec(query,
+		match.Week,
+		match.HomeTeam,
+		match.AwayTeam,
+		match.HomeGoals,
+		match.AwayGoals,
+	)
+	return err
+}

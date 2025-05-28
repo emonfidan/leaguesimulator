@@ -33,3 +33,35 @@ func InitDB() {
 
 	log.Println("Database connection established successfully")
 }
+
+func GetHistoricalMatches() ([]map[string]interface{}, error) {
+	query := `SELECT season, week, home_team_name, away_team_name, home_goals, away_goals 
+              FROM historical_matches 
+              ORDER BY season, week`
+	rows, err := DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var matches []map[string]interface{}
+	for rows.Next() {
+		var season, week, homeGoals, awayGoals int
+		var homeTeam, awayTeam string
+
+		err := rows.Scan(&season, &week, &homeTeam, &awayTeam, &homeGoals, &awayGoals)
+		if err != nil {
+			return nil, err
+		}
+
+		matches = append(matches, map[string]interface{}{
+			"season":     season,
+			"week":       week,
+			"home_team":  homeTeam,
+			"away_team":  awayTeam,
+			"home_goals": homeGoals,
+			"away_goals": awayGoals,
+		})
+	}
+	return matches, nil
+}
