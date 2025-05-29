@@ -16,11 +16,11 @@ func InitDB() {
 	var err error
 
 	// Environment variables ile database bilgilerini al
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "3306")
+	dbHost := getEnv("DB_HOST", "maglev.proxy.rlwy.net")
+	dbPort := getEnv("DB_PORT", "28557")
 	dbUser := getEnv("DB_USER", "root")
-	dbPass := getEnv("DB_PASSWORD", "emine")
-	dbName := getEnv("DB_NAME", "leaguesimulator")
+	dbPass := getEnv("DB_PASSWORD", "VksdcoEfzDhgviAExWlCINOLvDONjfru")
+	dbName := getEnv("DB_NAME", "railway")
 
 	// Production için güvenli DSN oluştur
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=30s&readTimeout=30s&writeTimeout=30s",
