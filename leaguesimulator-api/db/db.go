@@ -2,7 +2,9 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -13,20 +15,29 @@ var DB *sql.DB
 func InitDB() {
 	var err error
 
-	// Connection string with timeout and charset
-	dsn := "root:emine@tcp(localhost:3306)/leaguesimulator?charset=utf8mb4&parseTime=True&loc=Local&timeout=10s"
+	// Environment variables ile database bilgilerini al
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "3306")
+	dbUser := getEnv("DB_USER", "root")
+	dbPass := getEnv("DB_PASSWORD", "emine")
+	dbName := getEnv("DB_NAME", "leaguesimulator")
+
+	// Production için güvenli DSN oluştur
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=30s&readTimeout=30s&writeTimeout=30s",
+		dbUser, dbPass, dbHost, dbPort, dbName)
 
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatal("Failed to open database connection:", err)
 	}
 
-	// Set connection pool settings
-	DB.SetMaxOpenConns(10)
-	DB.SetMaxIdleConns(5)
-	DB.SetConnMaxLifetime(time.Hour)
+	// Production için optimize edilmiş connection pool settings
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(10)
+	DB.SetConnMaxLifetime(5 * time.Minute)
+	DB.SetConnMaxIdleTime(time.Minute)
 
-	// Test the connection
+	// Connection test et
 	if err = DB.Ping(); err != nil {
 		log.Fatal("Cannot connect to database:", err)
 	}
@@ -34,10 +45,18 @@ func InitDB() {
 	log.Println("Database connection established successfully")
 }
 
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 func GetHistoricalMatches() ([]map[string]interface{}, error) {
-	query := `SELECT season, week, home_team_name, away_team_name, home_goals, away_goals 
-              FROM historical_matches 
+	query := `SELECT season, week, home_team_name, away_team_name, home_goals, away_goals
+              FROM historical_matches
               ORDER BY season, week`
+
 	rows, err := DB.Query(query)
 	if err != nil {
 		return nil, err
@@ -63,5 +82,6 @@ func GetHistoricalMatches() ([]map[string]interface{}, error) {
 			"away_goals": awayGoals,
 		})
 	}
+
 	return matches, nil
 }

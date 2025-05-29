@@ -76,6 +76,17 @@ leaguesimulator/
      ...
    ```
 
+### Database Issues
+  Required MySQL 8.0+
+  Set environment variables in db/db.go:
+    export DB_HOST=localhost
+    export DB_PORT=3306
+    export DB_USER=your_mysql_username
+    export DB_PASSWORD=your_mysql_password
+    export DB_NAME=leaguesimulator
+    export PORT=8080
+  Execute schema.sql
+
 ## API Testing Guide
 
 ### 1. API Information
@@ -546,12 +557,6 @@ If Go modules fail:
 go clean -modcache
 go mod tidy
 ```
-
-### Database Issues
-If database connection fails:
-1. Check if database service is running
-2. Verify connection string in `db/database.go`
-3. Ensure proper permissions
 
 ## API Documentation
 
