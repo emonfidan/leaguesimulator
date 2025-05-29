@@ -115,7 +115,7 @@ func SetupRouter() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{
 			"name":        "Advanced Football League Simulator",
 			"version":     "2.0.0",
-			"description": "Enhanced league simulator with advanced ML predictions",
+			"description": "League simulator with advanced predictions",
 			"features": []string{
 				"Multi-factor prediction algorithm",
 				"Monte Carlo season simulation",
@@ -125,7 +125,7 @@ func SetupRouter() *gin.Engine {
 				"Live match editing",
 				"Championship probability calculation",
 			},
-			"author": "Insider Internship Candidate",
+			"author": "Emine FİDAN",
 		})
 	})
 
