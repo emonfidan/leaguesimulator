@@ -2,6 +2,14 @@
 
 LeagueSimulator shows match results of a group of football teams, the league table and estimates the final league table with advanced ML predictions and dynamic elimination rules.
 
+The backend and frontend of this project is deployed and publicly accessible at the following URL:
+
+🔗 https://leaguesimulator.onrender.com
+
+You can use this base URL to interact with the API endpoints from the frontend or tools like Postman.
+
+Also, the frontend URL: adorable-travesseiro-4d2bfa.netlify.app
+
 ## Project Structure
 ```
 leaguesimulator/
