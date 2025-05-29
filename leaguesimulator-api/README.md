@@ -77,15 +77,7 @@ leaguesimulator/
    ```
 
 ### Database Issues
-  Required MySQL 8.0+
-  Set environment variables in db/db.go:
-    export DB_HOST=localhost
-    export DB_PORT=3306
-    export DB_USER=your_mysql_username
-    export DB_PASSWORD=your_mysql_password
-    export DB_NAME=leaguesimulator
-    export PORT=8080
-  Execute schema.sql
+  The project database is configured in Railway. (Ephemeral) Database connection is provided automatically by Railway.
 
 ## API Testing Guide
 
