@@ -15,6 +15,94 @@ import (
 var manager league.LeagueManager
 var predictionService *prediction.AdvancedPredictionService
 
+// adjustPredictionPercentages modifies prediction percentages based on current week and standings
+func adjustPredictionPercentages(predictions *prediction.ComprehensivePrediction, currentWeek int, standings []league.TeamStanding) {
+	if len(standings) == 0 || predictions == nil {
+		return
+	}
+
+	// Get the top team's points
+	topPoints := standings[0].Points
+
+	// Create a map of eligible teams based on the week rules
+	eligibleTeams := make(map[string]bool)
+
+	switch {
+	case currentWeek >= 6:
+		// Week 6: Only the team with highest score gets 100%
+		for _, team := range standings {
+			eligibleTeams[team.Name] = (team.Points == topPoints)
+		}
+
+	case currentWeek >= 5:
+		// Week 5: Eliminate teams more than 3 points behind
+		for _, team := range standings {
+			eligibleTeams[team.Name] = (topPoints-team.Points <= 3)
+		}
+
+	case currentWeek >= 4:
+		// Week 4: Eliminate teams more than 6 points behind
+		for _, team := range standings {
+			eligibleTeams[team.Name] = (topPoints-team.Points <= 6)
+		}
+
+	default:
+		// Before week 4: All teams are eligible
+		for _, team := range standings {
+			eligibleTeams[team.Name] = true
+		}
+	}
+
+	// Calculate total probability of eligible teams
+	totalEligibleProb := 0.0
+	originalProbs := make(map[string]float64)
+
+	for teamName, prob := range predictions.SeasonSimulation.ChampionshipProbabilities {
+		originalProbs[teamName] = prob
+		if eligibleTeams[teamName] {
+			totalEligibleProb += prob
+		}
+	}
+
+	// Redistribute probabilities
+	if currentWeek >= 6 {
+		// Week 6: Winner takes all
+		for teamName := range predictions.SeasonSimulation.ChampionshipProbabilities {
+			if eligibleTeams[teamName] && standings[0].Name == teamName {
+				predictions.SeasonSimulation.ChampionshipProbabilities[teamName] = 100.0
+			} else {
+				predictions.SeasonSimulation.ChampionshipProbabilities[teamName] = 0.0
+			}
+		}
+	} else if totalEligibleProb > 0 {
+		// Weeks 4-5: Redistribute proportionally among eligible teams
+		redistributionFactor := 100.0 / totalEligibleProb
+
+		for teamName := range predictions.SeasonSimulation.ChampionshipProbabilities {
+			if eligibleTeams[teamName] {
+				predictions.SeasonSimulation.ChampionshipProbabilities[teamName] =
+					originalProbs[teamName] * redistributionFactor
+			} else {
+				predictions.SeasonSimulation.ChampionshipProbabilities[teamName] = 0.0
+			}
+		}
+	}
+
+	// Update simulation metadata
+	eliminatedCount := 0
+	for _, eligible := range eligibleTeams {
+		if !eligible {
+			eliminatedCount++
+		}
+	}
+
+	if eliminatedCount > 0 {
+		predictions.SeasonSimulation.Methodology = fmt.Sprintf(
+			"Adjusted probabilities: %d team(s) eliminated based on week %d rules",
+			eliminatedCount, currentWeek)
+	}
+}
+
 func SetupRouter() *gin.Engine {
 	router := gin.Default()
 	predictionService = prediction.NewAdvancedPredictionService()
@@ -163,6 +251,11 @@ func SetupRouter() *gin.Engine {
 			})
 			return
 		}
+
+		// Apply dynamic prediction adjustments based on current standings and week
+		standings := manager.GetStandings()
+		adjustPredictionPercentages(predictions, manager.Week, standings)
+
 		c.JSON(http.StatusOK, predictions)
 	})
 
@@ -194,9 +287,19 @@ func SetupRouter() *gin.Engine {
 			})
 			return
 		}
+
+		// Apply dynamic adjustments to the outlook
+		standings := manager.GetStandings()
+		tempPrediction := &prediction.ComprehensivePrediction{
+			SeasonSimulation: *outlook,
+		}
+		adjustPredictionPercentages(tempPrediction, manager.Week, standings)
+
 		c.JSON(http.StatusOK, gin.H{
-			"season_outlook": outlook,
-			"note":           "Based on 1000+ Monte Carlo simulations",
+			"season_outlook":       tempPrediction.SeasonSimulation,
+			"note":                 fmt.Sprintf("Adjusted for week %d elimination rules - Based on 1000+ Monte Carlo simulations", manager.Week),
+			"current_week":         manager.Week,
+			"standings_considered": len(standings),
 		})
 	})
 

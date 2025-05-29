@@ -4,7 +4,6 @@ import Header from './components/Header';
 import Home from './pages/Home';
 import LeaguePage from './pages/LeaguePage';
 import PredictionsPage from './pages/PredictionsPage';
-import TeamPage from './pages/TeamPage';
 
 const App: React.FC = () => {
   return (
@@ -16,7 +15,6 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/league" element={<LeaguePage />} />
             <Route path="/predictions" element={<PredictionsPage />} />
-            <Route path="/team/:teamName" element={<TeamPage />} />
           </Routes>
         </div>
       </div>

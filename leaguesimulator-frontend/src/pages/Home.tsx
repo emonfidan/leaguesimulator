@@ -22,19 +22,12 @@ const Home: React.FC = () => {
           
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
             <h2 className="text-xl font-semibold mb-2 text-green-800">Predictions</h2>
-            <p className="mb-4">Get match predictions and championship probabilities powered by machine learning.</p>
+            <p className="mb-4">Get match predictions and championship probabilities powered by multiple parameters.</p>
             <Link to="/predictions" className="text-green-600 hover:text-green-800 font-medium">
               View Predictions →
             </Link>
           </div>
-          
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-            <h2 className="text-xl font-semibold mb-2 text-purple-800">Team Analysis</h2>
-            <p className="mb-4">Detailed performance analysis for each team in the league.</p>
-            <Link to="/team/Lions/analysis" className="text-purple-600 hover:text-purple-800 font-medium">
-              View Team Analysis →
-            </Link>
-          </div>
+
         </div>
       </div>
       
@@ -44,7 +37,7 @@ const Home: React.FC = () => {
           <li>Initialize the league with default teams (Lions, Tigers, Bears, Wolves)</li>
           <li>Play matches week by week or simulate the entire season at once</li>
           <li>View standings, match results, and team statistics</li>
-          <li>Get AI-powered predictions for future matches</li>
+          <li>Get predictions for championship</li>
           <li>Analyze team performance and head-to-head records</li>
         </ol>
       </div>

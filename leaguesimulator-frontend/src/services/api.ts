@@ -81,3 +81,12 @@ export const getMatchesByWeek = async (weekNumber: number): Promise<Match[]> => 
   return transformedMatches;
 };
 
+export const getPredictionsWithElimination = async () => {
+  const response = await axios.get(`${API_BASE_URL}/predict-with-elimination`);
+  return response.data;
+};
+
+export const getEliminationStatus = async () => {
+  const response = await axios.get(`${API_BASE_URL}/elimination-status`);
+  return response.data;
+};
