@@ -85,7 +85,7 @@ leaguesimulator/
    ```
 
 ### Database Issues
-  The project database is configured in Railway. (Ephemeral) Database connection is provided automatically by Railway.
+  The project database is configured in Railway. (Ephemeral) Database connection is provided automatically by Railway. In case you cannot connect to database or connection is weak, modify db/db.go according to your local mySql username and password.
 
 ## API Testing Guide
 
